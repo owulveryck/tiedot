@@ -3,9 +3,10 @@ package httpapi
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"net/http"
 )
 
 var (
@@ -39,7 +40,7 @@ func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey string
 		ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey)
 	} else {
 		// No JWT
-		ServeEndpoints()
+		ServeCorsEndpoints()
 	}
 
 	if tlsCrt != "" {
@@ -87,4 +88,49 @@ func ServeEndpoints() {
 	// misc (stop-the-world)
 	http.HandleFunc("/shutdown", Shutdown)
 	http.HandleFunc("/dump", Dump)
+}
+
+func corsWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "must-revalidate")
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+		w.Header().Set("Access-Control-Expose-Headers", "Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		if r.Method == "OPTIONS" {
+			return
+		}
+		originalHandler(w, r)
+	}
+}
+
+func ServeCorsEndpoints() {
+	// collection management (stop-the-world)
+	http.HandleFunc("/create", corsWrap(Create))
+	http.HandleFunc("/rename", corsWrap(Rename))
+	http.HandleFunc("/drop", corsWrap(Drop))
+	http.HandleFunc("/all", corsWrap(All))
+	http.HandleFunc("/scrub", corsWrap(Scrub))
+	http.HandleFunc("/sync", corsWrap(Sync))
+	// query
+	http.HandleFunc("/query", corsWrap(Query))
+	http.HandleFunc("/count", corsWrap(Count))
+	// document management
+	http.HandleFunc("/insert", corsWrap(Insert))
+	http.HandleFunc("/get", corsWrap(Get))
+	http.HandleFunc("/getpage", corsWrap(GetPage))
+	http.HandleFunc("/update", corsWrap(Update))
+	http.HandleFunc("/delete", corsWrap(Delete))
+	http.HandleFunc("/approxdoccount", corsWrap(ApproxDocCount))
+	// index management (stop-the-world)
+	http.HandleFunc("/index", corsWrap(Index))
+	http.HandleFunc("/indexes", corsWrap(Indexes))
+	http.HandleFunc("/unindex", corsWrap(Unindex))
+	// misc
+	http.HandleFunc("/shutdown", corsWrap(Shutdown))
+	http.HandleFunc("/dump", corsWrap(Dump))
+
+	tdlog.Noticef("Http CORS is enabled.")
 }
