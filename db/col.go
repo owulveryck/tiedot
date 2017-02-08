@@ -136,7 +136,7 @@ func (col *Col) Index(idxPath []string) (err error) {
 	defer col.db.schemaLock.Unlock()
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
 	if _, exists := col.indexPaths[idxName]; exists {
-		return fmt.Errorf("Path %v is already indexed", idxPath)
+		return ErrAlreadyIndexed
 	}
 	col.indexPaths[idxName] = idxPath
 	idxDir := path.Join(col.db.path, col.name, idxName)
